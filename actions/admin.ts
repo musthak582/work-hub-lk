@@ -1,8 +1,8 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { createClient }      from "@/lib/supabase/server";
-import { revalidatePath }    from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types/actions";
 
 // ============================================
@@ -28,20 +28,25 @@ async function requireAdmin(): Promise<string | null> {
 // LOG ADMIN ACTION
 // ============================================
 async function logAdminAction(
-  adminEmail:  string,
-  action:      string,
+  adminEmail: string,
+  action: string,
   targetType?: string,
-  targetId?:   string,
-  details?:    Record<string, unknown>
+  targetId?: string,
+  details?: Record<string, unknown>
 ) {
   const adminSupabase = createAdminClient();
-  await adminSupabase.from("admin_logs").insert({
+
+  const logData = {
     admin_email: adminEmail,
     action,
     target_type: targetType ?? null,
-    target_id:   targetId   ?? null,
-    details:     details    ?? {},
-  });
+    target_id: targetId ?? null,
+    details: details ?? {},
+  };
+
+  await adminSupabase
+    .from("admin_logs")
+    .insert(logData as never);
 }
 
 // ============================================
@@ -61,7 +66,7 @@ export async function getAdminStatsAction() {
     { count: pendingPayments },
     { count: totalChats },
     { count: totalReviews },
-    { data:  recentPayments },
+    recentPaymentsResult,
     { count: bannedUsers },
   ] = await Promise.all([
     adminSupabase.from("users").select("id", { count: "exact" }),
@@ -95,19 +100,26 @@ export async function getAdminStatsAction() {
       .eq("is_banned", true),
   ]);
 
-  const totalRevenue = (recentPayments ?? [])
-    .reduce((s, p) => s + Number(p.amount), 0);
+  const recentPayments =
+    (recentPaymentsResult?.data as
+      | { amount?: string | number | null; created_at?: string | null; status?: string | null }[]
+      | null) ?? [];
+
+  const totalRevenue = recentPayments.reduce(
+    (s, p) => s + Number(p.amount ?? 0),
+    0
+  );
 
   return {
-    totalUsers:      totalUsers      ?? 0,
-    totalWorkers:    totalWorkers    ?? 0,
-    totalHirers:     totalHirers     ?? 0,
-    totalPayments:   totalPayments   ?? 0,
+    totalUsers: totalUsers ?? 0,
+    totalWorkers: totalWorkers ?? 0,
+    totalHirers: totalHirers ?? 0,
+    totalPayments: totalPayments ?? 0,
     pendingPayments: pendingPayments ?? 0,
-    totalChats:      totalChats      ?? 0,
-    totalReviews:    totalReviews    ?? 0,
+    totalChats: totalChats ?? 0,
+    totalReviews: totalReviews ?? 0,
     totalRevenue,
-    bannedUsers:     bannedUsers     ?? 0,
+    bannedUsers: bannedUsers ?? 0,
   };
 }
 
@@ -124,7 +136,7 @@ export async function getAdminUsersAction(
 
   const adminSupabase = createAdminClient();
   const pageSize = 20;
-  const offset   = (page - 1) * pageSize;
+  const offset = (page - 1) * pageSize;
 
   let query = adminSupabase
     .from("users")
@@ -283,7 +295,7 @@ export async function getAdminWorkersAction(page = 1, search = "") {
 
   const adminSupabase = createAdminClient();
   const pageSize = 20;
-  const offset   = (page - 1) * pageSize;
+  const offset = (page - 1) * pageSize;
 
   let query = adminSupabase
     .from("worker_profiles")
@@ -316,7 +328,7 @@ export async function getAdminPaymentsAction(page = 1) {
 
   const adminSupabase = createAdminClient();
   const pageSize = 20;
-  const offset   = (page - 1) * pageSize;
+  const offset = (page - 1) * pageSize;
 
   const { data, count } = await adminSupabase
     .from("payments")
