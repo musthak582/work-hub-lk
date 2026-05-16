@@ -11,8 +11,16 @@ import type { ActionResult } from "@/types/actions";
 async function requireAdmin(): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+
   if (!user) return null;
-  if (user.email !== process.env.ADMIN_EMAIL) return null;
+
+  // ensure email exists
+  if (!user.email) return null;
+
+  if (user.email !== process.env.ADMIN_EMAIL) {
+    return null;
+  }
+
   return user.email;
 }
 
